@@ -1,75 +1,295 @@
 "use client"
 import Image from 'next/image'
-import { FormEvent } from 'react';
-import { useState } from 'react';
+import { document } from 'postcss';
+import { Dispatch, FormEvent, MouseEventHandler, SetStateAction, UIEventHandler, useEffect } from 'react';
+import { useState, Fragment } from 'react';
+import { Popover, Transition  } from '@headlessui/react'
 
 type Item = {
   Name: string,
-  Price: number,
+  Price: string,
   Image: string,
-  Stickers: string[]
+  Quality: string,
+  Stickers: string[],
+  Link: string
 }
 
-function create_item(item: Item) {
+type Props = {item: Item};
+
+const qualities: ReadonlyMap<string, string> = new Map([
+  ["covert", "eb4b4b"]
+]);
+
+function ItemCard(props: Props) {
+  function goto_item() {
+    window.open(props.item.Link);
+  }
+
   return (
-    <div className="rounded-lg py-10 flex flex-col items-center justify-center shadow-lg border border-gray-100">
+    <div onClick={goto_item} className={`rounded-lg py-10 flex flex-col items-center justify-center shadow-lg border border-${qualities.get(props.item.Quality)} cursor-pointer`}>
          <Image
-        src={item.Image}
+        src={props.item.Image}
         width={110}
         height={110} alt={''}        />
 
-        <p className="font-bold mt-4">{item.Name}</p>
-        <p className="mt-2 text-sm text-gray-500">{item.Price}</p>
+        <p className="font-bold text-sm mt-4">{props.item.Name}</p>
+        <p className="mt-2 text-sm text-gray-500">{props.item.Price}</p>
     </div>
   )
 }
 
-const items: Item[] = [
-  {
-    Name: "asd",
-    Price: 12.43,
-    Image: 'https://steamcommunity-a.akamaihd.net/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpovbSsLQJf0ebcZThQ6tCvq4GFqOP9NL7DqWRD6ct2j9bN_Iv9nBrmrRY_NmmhJIDEegJtNFqCqFfrwOu6gsXov8zKziRnuiB0537VlhG3n1gSOW5JgsIr/110x110',
-    Stickers: []
-  },
-  {
-    Name: "asd",
-    Price: 0,
-    Image: 'https://steamcommunity-a.akamaihd.net/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpovbSsLQJf0ebcZThQ6tCvq4GFqOP9NL7DqWRD6ct2j9bN_Iv9nBrmrRY_NmmhJIDEegJtNFqCqFfrwOu6gsXov8zKziRnuiB0537VlhG3n1gSOW5JgsIr/110x110',
-    Stickers: []
-  }
-]
+type MultiSelectObject = {
+  type: string, selected: boolean
+}
+
+type NumberObject = {
+  type: string, value: string
+}
+
+type FilterProps<T> = {
+  name: string, 
+  array: T[], 
+  setArray: Dispatch<SetStateAction<T[]>>
+}
+
+type FilterButtonProps = {
+  open: boolean,
+  name: string
+}
+
+function FilterButton({open, name} : FilterButtonProps) {
+  return (
+    <Popover.Button
+      className={`
+        ${open ? '' : 'text-opacity-90'}
+        group inline-flex items-center rounded-md bg-slate-900 shadow-lg shadow-blue-100/40 px-3 py-2 text-base font-medium text-white hover:text-opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75`}
+    >
+      <span>{name}</span>
+    </Popover.Button>
+  )
+}
+
+function Filter(props: FilterProps<MultiSelectObject>) {
+  return (
+    <div className="top-16 max-w-sm px-4 z-10 flex justify-center">
+      <Popover className="relative">
+        {({ open }) => (
+          <>
+            <FilterButton open={open} name={props.name}/>
+            <Transition
+              as={Fragment}
+              enter="transition ease-out duration-200"
+              enterFrom="opacity-0 translate-y-1"
+              enterTo="opacity-100 translate-y-0"
+              leave="transition ease-in duration-150"
+              leaveFrom="opacity-100 translate-y-0"
+              leaveTo="opacity-0 translate-y-1"
+            >
+              <Popover.Panel className="absolute left-1/2 -translate-x-1/2 z-10 mt-3 sm:px-0 lg:max-w-3xl w-max justify-center">
+                <div className="overflow-hidden rounded-lg shadow-lg ring-1 ring-black ring-opacity-5">
+                  <div className="relative grid gap-8 bg-slate-900 p-7 lg:grid-cols-1">
+                    {props.array.map((option) => (
+                      <a
+                        onClick={e=>{option.selected = !option.selected; props.setArray(props.array.concat()); if (!option.selected) { console.log("disabled"); e.currentTarget.classList.add("text-gray-500");} else { console.log("enabled"); e.currentTarget.classList.remove("text-gray-500")}}}
+                        key={option.type}
+                        className={`${option.selected ? "" : "text-gray-500"} flex-1 -m-4 p-1 flex items-center rounded-lg hover:shadow-lg hover:shadow-blue-900/40 transition duration-150 cursor-pointer`}
+                      >
+
+                        <div className="w-full">
+                          <p className="text-sm text-center font-sm">
+                            {option.type}
+                          </p>
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              </Popover.Panel>
+            </Transition>
+          </>
+        )}
+      </Popover>
+    </div>
+  )
+}
+
+function FilterNumbers(props: FilterProps<NumberObject>) {
+  return (
+    <div className="top-16 max-w-sm px-4 z-10 flex justify-center">
+      <Popover className="relative">
+        {({ open }) => (
+          <>
+            <FilterButton open={open} name={props.name}/>
+            <Transition
+              as={Fragment}
+              enter="transition ease-out duration-200"
+              enterFrom="opacity-0 translate-y-1"
+              enterTo="opacity-100 translate-y-0"
+              leave="transition ease-in duration-150"
+              leaveFrom="opacity-100 translate-y-0"
+              leaveTo="opacity-0 translate-y-1"
+            >
+              <Popover.Panel className="absolute left-1/2 -translate-x-1/2 z-10 mt-3 sm:px-0 lg:max-w-3xl w-max justify-center">
+                <div className="overflow-hidden rounded-lg shadow-lg ring-1 ring-black ring-opacity-5">
+                  <div className={`relative grid gap-8 bg-slate-900 p-5 grid-cols-${props.array.length}`}>
+                    {props.array.map((option) => (
+                      <div className="inline-flex mb-3" data-te-input-wrapper-init>
+                          <input
+                            onKeyUp={e=>{
+                              if (e.key == "Enter" && option.value !== e.currentTarget.value) {
+                                option.value = e.currentTarget.value;
+                                props.setArray(props.array.concat());
+                                e.currentTarget.blur();
+                              }
+                            }}
+                            onBlur={e=>{
+                                if (option.value !== e.currentTarget.value) {
+                                  option.value = e.currentTarget.value;
+                                  props.setArray(props.array.concat());
+                                }
+                            }}
+                            defaultValue={option.value}
+                            type="number"
+                            className="mt-7 w-20 p-1 pl-2 rounded outline-0 shadow-lg shadow-blue-400/40 bg-transparent"
+                            id="exampleFormControlInputNumber"/>
+                            <label
+                              htmlFor="exampleFormControlInputNumber"
+                              className="pointer-events-none absolute"
+                              >{option.type}
+                            </label>
+                          
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </Popover.Panel>
+            </Transition>
+          </>
+        )}
+      </Popover>
+    </div>
+  )
+}
 
 export default function Home() {
-  const [formData, setFormData] = useState({
-    search: ""
-  });
+  let [items, setItems] = useState<Item[]>([])
+  const [search, setSearch] = useState("");
+  let cursorDMarket = "";
+  let inprogress = false;
+
+  const [wears, setWears] = useState<MultiSelectObject[]>([
+    {type: "Factory New", selected: true},
+    {type: "Minimal Wear", selected: true},
+    {type: "Field-Tested", selected: true},
+    {type: "Well-Worn", selected: true},
+    {type: "Battle-Scarred", selected: true},
+  ]);
+
+  const [stattrak, setStatTrak] = useState<MultiSelectObject[]>([
+    {type: "StatTrak", selected: true},
+    {type: "Regular", selected: true},
+  ]);
+
+  const [prices, setPrices] = useState<NumberObject[]>([
+    {type: "From", value: ""},
+    {type: "To", value: ""},
+  ]);
+
+  async function update_dmarket(new_search: boolean = false) {
+      if (new_search) {
+        items = [];
+        cursorDMarket = "";
+      }
+
+      if (cursorDMarket == "0")
+        return;
+
+      let filters = wears.filter((wear) => wear.selected == true).map((wear) => `exterior[]=${wear.type.toLowerCase()}`);
+
+      filters = filters.concat(stattrak.filter((x) => x.selected == true).map((x) => `category_0[]=${x.type.length == 8 ? "stattrak_tm" : "not_stattrak_tm"}`));
+
+      const filter_price = (price: string) => {
+        if (price.length == 0) return price;
+
+        if (price.includes('.'))
+          return price.replace('.', '');
+
+        return price + "00";
+      }
+
+      const dmarket_query = {
+        side: "market",
+        orderBy: "personal",
+        orderDir: "desc",
+        title: search,
+        priceFrom: filter_price(prices[0].value) || "0",
+        priceTo: filter_price(prices[1].value) || "0",
+        gameId: "a8db",
+        types: "dmarket",
+        cursor: cursorDMarket,
+        limit: "100",
+        currency: "USD",
+        platform: "browser",
+        treeFilters: filters.join(',')
+      };
+
+      const resp = await fetch(`https://api.dmarket.com/exchange/v1/market/items?${new URLSearchParams(dmarket_query)}`, { method: "GET", mode: 'cors', next: { revalidate: 10 } })
+      .catch(e => {
+        console.log("error:", e);
+      }) || null; // cache revalidates after 10 seconds. for no cache: { cache: 'no-store' }
+      
+      if (!resp || !resp.ok)
+        return;
+      
+      const data = await resp.json();
+
+      if (!data.objects || data.objects.length == 0) {
+        cursorDMarket = "0";
+        return;
+      }
+
+      for (let i = 0; i < data.objects.length; i++) {
+        let price_str: string = data.objects[i].price.USD;
+        const dollars = price_str.substring(0, price_str.length - 2) || "0";
+        price_str = dollars + '.' + price_str.substring(price_str.length - 2);
+
+        items.push({
+          Name: data.objects[i].title,
+          Price: price_str,
+          Image: data.objects[i].image,
+          Quality: data.objects[i].extra.quality,
+          Stickers: [],
+          Link: "https://dmarket.com/ingame-items/item-list/csgo-skins?userOfferId=" + data.objects[i].extra.linkId
+        });
+      } 
+
+      cursorDMarket = data.cursor ? data.cursor : "0";
+      setItems(items);
+  }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-  
-  
+      event.preventDefault();
+
+      await update_dmarket(true);
   
       console.log('Form submitted successfully!');
   
   };
 
-  const handleChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData({
-      ...formData,
-      [event.target.name]: event.target.value
-    });
+  const itemsOnScroll = async (e: any) => {
+    if ((e.currentTarget.scrollTop / e.currentTarget.scrollHeight) >= 0.8 && !inprogress) {
+      inprogress = true;
+      console.log("doing it")
+      await update_dmarket(true).catch(_=>{});
+      inprogress = false;
+    }
   };
 
-  for (let index = 0; index < 50; index++) {
-    items.push(
-      {
-        Name: "asd",
-        Price: 0,
-        Image: 'https://steamcommunity-a.akamaihd.net/economy/image/-9a81dlWLwJ2UUGcVs_nsVtzdOEdtWwKGZZLQHTxDZ7I56KU0Zwwo4NUX4oFJZEHLbXH5ApeO4YmlhxYQknCRvCo04DEVlxkKgpovbSsLQJf0ebcZThQ6tCvq4GFqOP9NL7DqWRD6ct2j9bN_Iv9nBrmrRY_NmmhJIDEegJtNFqCqFfrwOu6gsXov8zKziRnuiB0537VlhG3n1gSOW5JgsIr/110x110',
-        Stickers: []
-      }
-    )
-  }
+  // Update items if filters change
+  useEffect(() => {
+    console.log("filter change detected")
+    update_dmarket(true);
+  }, [wears, stattrak, prices]);
 
   return (
     <main>
@@ -102,7 +322,13 @@ export default function Home() {
         <div className="max-w-7xl px-10 mx-auto sm:text-center">
             <p className="text-blue-500 font-medium uppercase">Our Application Integrations</p>
             <h2 className="font-bold text-3xl sm:text-4xl lg:text-5xl mt-3">Connect with Your Favorite Apps.</h2>
-            <p className="mt-4 text-gray-500 text-base sm:text-xl lg:text-2xl">We've built integrations with some of your favorite services.<br className="lg:hidden hidden sm:block"/> Check'em out below 👇</p>
+            <p className="mt-4 text-gray-500 text-base sm:text-xl lg:text-2xl">We've built integrations with some of your favorite services.<br className="lg:hidden hidden sm:block"/> Check'em out below</p>
+            <br/>
+            <div className="flex flex-row-reverse">
+              <Filter name="Condition" array={wears} setArray={setWears}/>
+              <Filter name="StatTrak" array={stattrak} setArray={setStatTrak}/>
+              <FilterNumbers name="Price" array={prices} setArray={setPrices}/>
+            </div>
             <br/>
 
             <form onSubmit={handleSubmit}>
@@ -112,22 +338,20 @@ export default function Home() {
                       <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
                           <svg aria-hidden="true" className="w-5 h-5 text-gray-500 dark:text-gray-400" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"></path></svg>
                       </div>
-                      <input type="text" name="search" value={formData.search} onChange={handleChange} className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 p-2.5  dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="Search" required/>
+                      <input type="text" value={search} onChange={e => { setSearch(e.currentTarget.value) } } className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 p-2.5  dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500" placeholder="Search"/>
                   </div>
               </div>
             </form>
 
             <br/>
 
-            <div className="max-w-screen max-h-screen overflow-auto scroll-px-100 scroll-mx-100">
+            <div onScroll={itemsOnScroll} className="max-w-screen max-h-screen overflow-auto px-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 my-12 sm:my-16">
                   {
-                    items.map(item=>create_item(item))
+                    items.map(item=><ItemCard item={item}/>)
                   }
               </div>
             </div>
-
-            <a href="#_" className="px-8 py-4 sm:w-auto w-full text-center text-base font-medium inline-block rounded text-white hover:bg-blue-600 bg-blue-500">View All Integrations</a>
         </div>
       </section>
 
