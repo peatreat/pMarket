@@ -1,36 +1,11 @@
 "use client";
-import Image from "next/image";
-import { document } from "postcss";
-import {
-  Dispatch,
-  FormEvent,
-  MouseEventHandler,
-  ReactNode,
-  SetStateAction,
-  UIEventHandler,
-  useEffect,
-  useRef,
-} from "react";
+import { Dispatch, FormEvent, SetStateAction, useEffect, useRef } from "react";
 import { useState, Fragment } from "react";
 import { Popover, Transition } from "@headlessui/react";
-import { NumberLiteralType } from "typescript";
-import Script from "next/script";
+import * as globals from "./src/globals";
+import { update_items } from "./src/markets";
 
-type StickerObject = {
-  name: string;
-  image: string;
-};
-
-type Item = {
-  Name: string;
-  Price: string;
-  Image: string;
-  Quality: string;
-  Stickers: StickerObject[];
-  Link: string;
-};
-
-type Props = { class: string; item: Item; onclick: () => void };
+type Props = { class: string; item: globals.Item; onclick: () => void };
 
 const qualities = new Map([
   ["covert", { border: "border-covert", shadow: "hover:shadow-covert" }],
@@ -73,7 +48,7 @@ function ItemCard(props: Props) {
         <p className="font-bold text-sm mt-4">{props.item.Name}</p>
       )}
 
-      {props.item.Price.length > 0 && (
+      {props.item.Price > 0 && (
         <p className="mt-2 text-sm text-gray-500 text-green-200/60">
           <span className="mr-[0.1em]">$</span>
           {props.item.Price}
@@ -105,7 +80,6 @@ function ItemCard(props: Props) {
 
 type SelectObject = {
   type: string;
-  dmarket: string;
 };
 
 type MultiSelectObject = {
@@ -411,9 +385,7 @@ function FilterNumberArray(props: FilterPropsArray<string>) {
                   <div
                     className={`${
                       props.array.length === 0 ? "hidden" : ""
-                    } relative grid grid-cols-${
-                      props.columns
-                    } p-4 gap-x-2 gap-y-2`}
+                    } relative grid grid-cols-4 p-4 gap-x-2 gap-y-2`}
                   >
                     {props.array.map((seed) => (
                       <button
@@ -455,8 +427,8 @@ function GrayCirclePlus() {
   );
 }
 
-function FilterStickers(props: FilterPropsArray<StickerObject>) {
-  const handleAddSticker = (sticker: StickerObject) => {
+function FilterStickers(props: FilterPropsArray<globals.StickerObject>) {
+  const handleAddSticker = (sticker: globals.StickerObject) => {
     if (props.array.length === 4) return;
     props.setArray(props.array.concat([sticker]));
   };
@@ -464,7 +436,7 @@ function FilterStickers(props: FilterPropsArray<StickerObject>) {
   const [search, setSearch] = useState("");
 
   let offset = useRef(0);
-  let [stickerList, setStickerList] = useState<Item[]>([]);
+  let [stickerList, setStickerList] = useState<globals.Item[]>([]);
 
   const update_stickers_dmarket = async (new_search: boolean = false) => {
     if (new_search) {
@@ -504,10 +476,12 @@ function FilterStickers(props: FilterPropsArray<StickerObject>) {
     for (let i = 0; i < data.objects.length; i++) {
       stickerList.push({
         Name: data.objects[i].title,
-        Price: "",
+        Price: 0,
+        Discount: 0,
         Image: data.objects[i].image,
         Quality: "",
         Stickers: [],
+        Date: 0,
         Link: "",
       });
     }
@@ -556,7 +530,7 @@ function FilterStickers(props: FilterPropsArray<StickerObject>) {
                 <div className="overflow-hidden rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 bg-slate-900">
                   <div className={`relative gap-y-2 p-5`}>
                     <div
-                      className={`relative grid grid-cols-${props.columns} p-4 gap-x-6 mb-4`}
+                      className={`relative grid grid-cols-4 p-4 gap-x-6 mb-4`}
                     >
                       {props.array.map((sticker, i) => (
                         <div className="bg-gray-900 rounded-2xl shadow-lg shadow-gray-700/40 hover:shadow-red-900/80 hover:scale-105 flex items-center min-h-[156px]">
@@ -564,10 +538,12 @@ function FilterStickers(props: FilterPropsArray<StickerObject>) {
                             class={"p-1"}
                             item={{
                               Name: "",
-                              Price: "",
+                              Price: 0,
+                              Discount: 0,
                               Image: sticker.image,
                               Quality: "",
                               Stickers: [],
+                              Date: 0,
                               Link: "",
                             }}
                             onclick={() => {
@@ -626,7 +602,7 @@ function FilterStickers(props: FilterPropsArray<StickerObject>) {
                       className="overflow-auto px-4 my-6 max-h-[18em]"
                     >
                       <div
-                        className={`grid grid-cols-1 sm:grid-cols-${props.columns} gap-6 my-2`}
+                        className={`grid grid-cols-1 sm:grid-cols-4 gap-6 my-2`}
                       >
                         {stickerList.map((sticker) => (
                           <ItemCard
@@ -659,14 +635,14 @@ function FilterStickers(props: FilterPropsArray<StickerObject>) {
 }
 
 export default function Home() {
-  let [items, setItems] = useState<Item[]>([]);
+  let [items, setItems] = useState<globals.Item[]>([]);
   const [search, setSearch] = useState("");
-  const [sort, setSort] = useState(4);
+  const [sort, setSort] = useState(0);
   const [order, setOrder] = useState(0);
   const [seeds, setSeeds] = useState<string[]>([]);
-  const [stickers, setStickers] = useState<StickerObject[]>([]);
+  const [stickers, setStickers] = useState<globals.StickerObject[]>([]);
   let cursorDMarket = useRef("");
-  let cursorCsmoney = useRef("");
+  let cursorCsmoney = useRef(0);
   let inprogress = false;
 
   const [wears, setWears] = useState<MultiSelectObject[]>([
@@ -728,163 +704,35 @@ export default function Home() {
   ]);
 
   const sorts = [
-    { type: "Price", dmarket: "price" },
-    { type: "Deal", dmarket: "best_deals" },
-    { type: "Discount", dmarket: "best_discount" },
-    { type: "Date Added", dmarket: "updated" },
-    { type: "Recommended", dmarket: "personal" },
+    { type: "Default" },
+    { type: "Price" },
+    { type: "Discount" },
+    { type: "Date Added" },
   ] as const satisfies readonly SelectObject[];
 
   const orders = [
-    { type: "Descending", dmarket: "desc" },
-    { type: "Ascending", dmarket: "asc" },
+    { type: "Descending" },
+    { type: "Ascending" },
   ] as const satisfies readonly SelectObject[];
-
-  async function update_csmoney(new_search: boolean = false) {
-    if (new_search) {
-      items = [];
-      cursorCsmoney.current = "";
-    }
-
-    if (cursorCsmoney.current === "0") return;
-  }
-
-  async function update_dmarket(new_search: boolean = false) {
-    if (new_search) {
-      items = [];
-      cursorDMarket.current = "";
-    }
-
-    console.log("searching with cursor", cursorDMarket.current);
-
-    if (cursorDMarket.current === "0") return;
-
-    const filters = wears
-      .filter((wear) => wear.selected)
-      .map((wear) => `exterior[]=${wear.type.toLowerCase()}`);
-
-    filters.push(
-      ...stattrak
-        .filter((x) => x.selected)
-        .map(
-          (x) =>
-            `category_0[]=${
-              x.type === "StatTrak" ? "stattrak_tm" : "not_stattrak_tm"
-            }`
-        )
-    );
-
-    filters.push(
-      ...souvenir
-        .filter((x) => x.selected)
-        .map(
-          (x) =>
-            `category_1[]=${
-              x.type === "Souvenir" ? "souvenir" : "not_souvenir"
-            }`
-        )
-    );
-
-    filters.push(
-      ...floats
-        .filter((float) => float.value.length > 0)
-        .map(
-          (float) =>
-            `${float.type == "From" ? "floatValueFrom[]=" : "floatValueTo[]="}${
-              float.value
-            }`
-        )
-    );
-
-    filters.push(
-      ...quality
-        .filter((x) => x.selected)
-        .map((x) => `quality[]=${x.type.toLowerCase()}`)
-    );
-
-    filters.push(...seeds.map((seed) => `paintSeed[]=${seed}`));
-
-    filters.push(
-      ...phases
-        .filter((phase) => phase.selected)
-        .map((phase) => `phase[]=${phase.type.toLowerCase().replace(" ", "-")}`)
-    );
-
-    filters.push(
-      ...stickers.map((sticker) => `stickerNames[]=${sticker.name}`)
-    );
-
-    const filter_price = (price: string) => {
-      if (price.length == 0) return price;
-
-      if (price.includes(".")) return price.replace(".", "");
-
-      return price + "00";
-    };
-
-    const dmarket_query = {
-      side: "market",
-      orderBy: sorts[sort].dmarket,
-      orderDir: orders[order].dmarket,
-      title: search,
-      priceFrom: filter_price(prices[0].value) || "0",
-      priceTo: filter_price(prices[1].value) || "0",
-      gameId: "a8db",
-      types: "dmarket",
-      cursor: cursorDMarket.current,
-      limit: "100",
-      currency: "USD",
-      platform: "browser",
-      treeFilters: filters.join(","),
-    };
-
-    const resp =
-      (await fetch(
-        `https://api.dmarket.com/exchange/v1/market/items?${new URLSearchParams(
-          dmarket_query
-        )}`,
-        { method: "GET", mode: "cors", next: { revalidate: 10 } }
-      ).catch((e) => {
-        console.log("error:", e);
-      })) || null; // cache revalidates after 10 seconds. for no cache: { cache: 'no-store' }
-
-    if (!resp || !resp.ok) return;
-
-    const data = await resp.json();
-
-    if (!data.objects || data.objects.length == 0) {
-      if (new_search) setItems([]);
-
-      cursorDMarket.current = "0";
-      return;
-    }
-
-    for (let i = 0; i < data.objects.length; i++) {
-      let price_str: string = data.objects[i].price.USD;
-      const dollars = price_str.substring(0, price_str.length - 2) || "0";
-      price_str = dollars + "." + price_str.substring(price_str.length - 2);
-
-      items.push({
-        Name: data.objects[i].title,
-        Price: price_str,
-        Image: data.objects[i].image,
-        Quality: data.objects[i].extra.quality,
-        Stickers: data.objects[i].extra.stickers || [],
-        Link:
-          "https://dmarket.com/ingame-items/item-list/csgo-skins?userOfferId=" +
-          data.objects[i].extra.linkId,
-      });
-    }
-
-    cursorDMarket.current = data.cursor ? data.cursor : "0";
-    console.log("cursor set to", cursorDMarket.current);
-    setItems(items.concat());
-  }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    await update_dmarket(true);
+    await update_items(true, items, setItems, cursorDMarket, cursorCsmoney, {
+      search,
+      wears,
+      stattrak,
+      souvenir,
+      floats,
+      quality,
+      seeds,
+      phases,
+      stickers,
+      prices,
+      sort,
+      order,
+    });
+    //await update_dmarket(true);
 
     console.log("Form submitted successfully!");
   };
@@ -898,7 +746,21 @@ export default function Home() {
     ) {
       inprogress = true;
       console.log("doing it");
-      await update_dmarket().catch((_) => {});
+      await update_items(false, items, setItems, cursorDMarket, cursorCsmoney, {
+        search,
+        wears,
+        stattrak,
+        souvenir,
+        floats,
+        quality,
+        seeds,
+        phases,
+        stickers,
+        prices,
+        sort,
+        order,
+      });
+      //await update_dmarket();
       inprogress = false;
     }
   };
@@ -923,7 +785,20 @@ export default function Home() {
       }
 
       console.log("searching...");
-      update_dmarket(true).then((_) => filter_changes.current--);
+      update_items(true, items, setItems, cursorDMarket, cursorCsmoney, {
+        search,
+        wears,
+        stattrak,
+        souvenir,
+        floats,
+        quality,
+        seeds,
+        phases,
+        stickers,
+        prices,
+        sort,
+        order,
+      }).then((_) => filter_changes.current--);
     }, 1500);
   }, [
     wears,
@@ -1130,7 +1005,7 @@ export default function Home() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-6 my-2">
               {items.map((item) => (
                 <ItemCard
-                  class={`relative duration-300 ${
+                  class={`relative hover:z-10 duration-300 ${
                     qualities.get(item.Quality)?.shadow
                   } rounded-lg px-2 px-2 bg-gray-900/80 hover:scale-105 hover:shadow-sm border py-8 flex flex-col justify-center shadow-lg ${
                     qualities.get(item.Quality)?.border
